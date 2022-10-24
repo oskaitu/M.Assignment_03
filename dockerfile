@@ -10,6 +10,7 @@ RUN mkdir -p /docker_folder/proto
 WORKDIR /docker_folder
 
 COPY ./proto/service_grpc.pb.go /docker_folder/proto
+COPY ./proto/service.pb.go /docker_folder/proto
 COPY ./main.go /docker_folder
 
 COPY go.mod .
