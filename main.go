@@ -7,9 +7,11 @@ import (
 	"os"
 	"sync"
 
-	proto "github.com/oskaitu/M.Assignment_03/proto"
 	"google.golang.org/grpc"
 	glog "google.golang.org/grpc/grpclog"
+
+	proto "github.com/oskaitu/M.Assignment_03/proto"
+
 )
 
 var grpcLog glog.LoggerV2
@@ -27,6 +29,7 @@ type Connection struct {
 
 type Server struct {
 	Connection []*Connection
+	proto.BroadcastServer
 }
 
 func (s *Server) CreateStream(pconn *proto.Connect, stream proto.Broadcast_CreateStreamServer) error {
@@ -76,8 +79,7 @@ func (s *Server) BroadcastMesssage(ctx context.Context, msg *proto.Message) (*pr
 
 func main() {
 	var connections []*Connection
-
-	server := &Server{connections}
+	server := &Server{connections, proto.UnimplementedBroadcastServer{}}
 
 	grpcServer := grpc.NewServer()
 	listener, err := net.Listen("tcp", ":8080")
