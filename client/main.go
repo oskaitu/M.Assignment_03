@@ -49,14 +49,13 @@ func connect(user *proto.User) error {
 				break
 			}
 
-			fmt.Printf("%s : %s\n", msg.Username, msg.Content)
 
 
 			if lamport_time < msg.Timestamp {
 				lamport_time = msg.Timestamp
 			}
 
-			fmt.Printf("%v : %s, at time %d\n", msg.Id, msg.Content, msg.Timestamp)
+			fmt.Printf("%s : %s, at time %d\n", msg.Username, msg.Content, msg.Timestamp)
 
 			lamport_time++
 
