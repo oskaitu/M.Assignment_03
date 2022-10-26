@@ -49,6 +49,9 @@ func connect(user *proto.User) error {
 				break
 			}
 
+			fmt.Printf("%s : %s\n", msg.Username, msg.Content)
+
+
 			if lamport_time < msg.Timestamp {
 				lamport_time = msg.Timestamp
 			}
@@ -56,6 +59,7 @@ func connect(user *proto.User) error {
 			fmt.Printf("%v : %s, at time %d\n", msg.Id, msg.Content, msg.Timestamp)
 
 			lamport_time++
+
 		}
 
 	}(stream)
@@ -96,6 +100,7 @@ func main() {
 				Id:        user.Id,
 				Content:   scanner.Text(),
 				Timestamp: lamport_time,
+        Username: user.Name,
 			}
 
 			_, err := client.BroadcastMesssage(context.Background(), msg)
