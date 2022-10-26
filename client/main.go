@@ -81,7 +81,7 @@ func connect(user *proto.User) error {
 				set_time(&lamport_clock, msg.Timestamp)
 			}
 
-			fmt.Printf("%v : %s, at time %d\n", msg.Id, msg.Content, msg.Timestamp)
+			fmt.Printf("%s : %s, at time %d\n", msg.Username, msg.Content, msg.Timestamp)
 
 			update_time(&lamport_clock)
 		}
@@ -128,6 +128,7 @@ func main() {
 				Id:        user.Id,
 				Content:   text,
 				Timestamp: get_time(&lamport_clock),
+        Username: user.Name,
 			}
 
 			_, err := client.BroadcastMesssage(context.Background(), msg)
