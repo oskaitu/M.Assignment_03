@@ -19,11 +19,33 @@ import (
 
 var client proto.BroadcastClient
 var wait *sync.WaitGroup
-var lamport_time int32
+var lamport_clock LamportClock
+
+type LamportClock struct {
+	mu   sync.Mutex
+	time int32
+}
+
+func set_time(clock *LamportClock, value int32) {
+	clock.mu.Lock()
+	defer clock.mu.Unlock()
+	clock.time = value
+}
+
+func update_time(clock *LamportClock) {
+	clock.mu.Lock()
+	defer clock.mu.Unlock()
+	clock.time++
+}
+
+func get_time(clock *LamportClock) int32 {
+	clock.mu.Lock()
+	defer clock.mu.Unlock()
+	return clock.time
+}
 
 func init() {
 	wait = &sync.WaitGroup{}
-
 }
 
 func connect(user *proto.User) error {
@@ -38,6 +60,8 @@ func connect(user *proto.User) error {
 		return fmt.Errorf("Connection failed :%v", err)
 	}
 
+	// TODO: add join
+
 	wait.Add(1)
 	go func(str proto.Broadcast_CreateStreamClient) {
 		defer wait.Done()
@@ -49,13 +73,17 @@ func connect(user *proto.User) error {
 				break
 			}
 
-			if lamport_time < msg.Timestamp {
-				lamport_time = msg.Timestamp
+			if msg.Id == user.Id {
+				continue
+			}
+
+			if lamport_clock.time < msg.Timestamp {
+				set_time(&lamport_clock, msg.Timestamp)
 			}
 
 			fmt.Printf("%v : %s, at time %d\n", msg.Id, msg.Content, msg.Timestamp)
 
-			lamport_time++
+			update_time(&lamport_clock)
 		}
 
 	}(stream)
@@ -92,10 +120,14 @@ func main() {
 
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
+			text := scanner.Text()
+
+			update_time(&lamport_clock)
+
 			msg := &proto.Message{
 				Id:        user.Id,
-				Content:   scanner.Text(),
-				Timestamp: lamport_time,
+				Content:   text,
+				Timestamp: get_time(&lamport_clock),
 			}
 
 			_, err := client.BroadcastMesssage(context.Background(), msg)
