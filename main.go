@@ -61,7 +61,7 @@ func send_message(message *Message, connection *Connection) {
 	if !connection.active {
 		return
 	}
-	if(message.Content == " " || message.Content == ""){
+	if message.Content == " " || message.Content == "" || len([]rune(message.Content)) > 128 {
 		return
 	}
 

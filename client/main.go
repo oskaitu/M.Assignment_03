@@ -107,8 +107,7 @@ func main() {
 	name = userinput
 
 	id := sha256.Sum256([]byte(time.Now().String() + name))
-//10.26.12.19 ip for oscar on ITU++
-	conn, err := grpc.Dial(":8080", grpc.WithInsecure())
+	conn, err := grpc.Dial("10.26.4.16:8080", grpc.WithInsecure())
 
 	if err != nil {
 		log.Fatalf("Couldn't connect to service: %v", err)
