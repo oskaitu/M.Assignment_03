@@ -61,6 +61,9 @@ func send_message(message *Message, connection *Connection) {
 	if !connection.active {
 		return
 	}
+	if(message.Content == " " || message.Content == ""){
+		return
+	}
 
 	err := connection.stream.Send(message)
 	grpcLog.Info("Sending message to: ", connection.stream, " username:", connection.name)
