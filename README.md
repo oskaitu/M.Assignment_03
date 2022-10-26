@@ -22,11 +22,15 @@ docker build --tag=test .
 
 docker run --rm -it  -p 8080:8080 --name chatservice test
 
-remember to run host on a public network (not set to private)
+remember to run server on a public network (not set to private)
 
 ## To connect the client (Remember to be inside the client folder):
 
 go run main.go -N "name"
+
+set client.go contain host IP address 
+check ipconfig /all under IPv4 
+host can just have :8080 in their client.go
 
 
 
