@@ -19,8 +19,9 @@ import (
 
 var client proto.BroadcastClient
 var wait *sync.WaitGroup
+var lamport_time int32
 
-func init(){
+func init() {
 	wait = &sync.WaitGroup{}
 
 }
@@ -29,7 +30,7 @@ func connect(user *proto.User) error {
 	var streamerror error
 
 	stream, err := client.CreateStream(context.Background(), &proto.Connect{
-		User: user,
+		User:   user,
 		Active: true,
 	})
 
@@ -38,16 +39,27 @@ func connect(user *proto.User) error {
 	}
 
 	wait.Add(1)
-	go func(str proto.Broadcast_CreateStreamClient){
+	go func(str proto.Broadcast_CreateStreamClient) {
 		defer wait.Done()
 
-		for{
+		for {
 			msg, err := str.Recv()
 			if err != nil {
 				streamerror = fmt.Errorf("Error reading message: %v", err)
 				break
 			}
+
 			fmt.Printf("%s : %s\n", msg.Username, msg.Content)
+
+
+			if lamport_time < msg.Timestamp {
+				lamport_time = msg.Timestamp
+			}
+
+			fmt.Printf("%v : %s, at time %d\n", msg.Id, msg.Content, msg.Timestamp)
+
+			lamport_time++
+
 		}
 
 	}(stream)
@@ -56,13 +68,12 @@ func connect(user *proto.User) error {
 }
 
 func main() {
-	timestamp := time.Now()
 	done := make(chan int)
 
 	name := flag.String("N", "Anon", "The name of the user")
 	flag.Parse()
 
-	id := sha256.Sum256([]byte(timestamp.String() + *name))
+	id := sha256.Sum256([]byte(time.Now().String() + *name))
 
 	conn, err := grpc.Dial(":8080", grpc.WithInsecure())
 
@@ -72,7 +83,7 @@ func main() {
 
 	client = proto.NewBroadcastClient(conn)
 	user := &proto.User{
-		Id: hex.EncodeToString(id[:]),
+		Id:   hex.EncodeToString(id[:]),
 		Name: *name,
 	}
 
@@ -84,12 +95,12 @@ func main() {
 		defer wait.Done()
 
 		scanner := bufio.NewScanner(os.Stdin)
-		for scanner.Scan(){
+		for scanner.Scan() {
 			msg := &proto.Message{
-				Id: 	user.Id,
-				Content: scanner.Text(),
-				Timestamp: timestamp.String(),
-				Username: user.Name,
+				Id:        user.Id,
+				Content:   scanner.Text(),
+				Timestamp: lamport_time,
+        Username: user.Name,
 			}
 
 			_, err := client.BroadcastMesssage(context.Background(), msg)
@@ -105,6 +116,6 @@ func main() {
 		close(done)
 	}()
 
-	<- done
+	<-done
 
 }
