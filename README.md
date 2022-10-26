@@ -26,7 +26,7 @@ docker build -f dockerfile.client --tag=clienttest .
 
 ## To start the server:
 
-docker run --rm -it  -p 8080:8080 --name chatservice test
+docker run --rm -it  -p 8080:8080 --name chatservice servertest
 
 remember to run server on a public network (not set to private)
 

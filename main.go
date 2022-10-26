@@ -29,17 +29,17 @@ type Connection struct {
 	error  chan error
 }
 
-type Server struct {
-	Connection []*Connection
-	proto.BroadcastServer
-	message_vault MessageVault
-}
-
 type Message = proto.Message
 
 type MessageVault struct {
 	mu       sync.Mutex
 	messages []*Message
+}
+
+type Server struct {
+	connections []*Connection
+	proto.BroadcastServer
+	message_vault MessageVault
 }
 
 func add_message(vault *MessageVault, message *Message) {
@@ -57,6 +57,15 @@ func add_message(vault *MessageVault, message *Message) {
 	})
 }
 
+func latest_time(vault *MessageVault) int32 {
+	vault.mu.Lock()
+	defer vault.mu.Unlock()
+	if len(vault.messages) == 0 {
+		return 0
+	}
+	return vault.messages[len(vault.messages)-1].Timestamp
+}
+
 func send_message(message *Message, connection *Connection) {
 	if !connection.active {
 		return
@@ -72,36 +81,11 @@ func send_message(message *Message, connection *Connection) {
 	}
 }
 
-func (s *Server) CreateStream(pconn *proto.Connect, stream proto.Broadcast_CreateStreamServer) error {
-	connection := &Connection{
-		stream: stream,
-		id:     pconn.User.Id,
-		name:   pconn.User.Name,
-		active: true,
-		error:  make(chan error),
-	}
-
-	// Get client up to date
-	s.message_vault.mu.Lock()
-	for _, message := range s.message_vault.messages {
-		send_message(message, connection)
-	}
-	s.message_vault.mu.Unlock()
-
-	// Add client connection to pool of connections
-	s.Connection = append(s.Connection, connection)
-
-	return <-connection.error
-}
-
-func (s *Server) BroadcastMesssage(context context.Context, message *proto.Message) (*proto.Close, error) {
+func send_to_all(connections []*Connection, message *Message) {
 	wait := sync.WaitGroup{}
 	done := make(chan int)
 
-	// Add message to server "vault"
-	add_message(&s.message_vault, message)
-
-	for _, connection := range s.Connection {
+	for _, connection := range connections {
 		wait.Add(1)
 
 		go func(message *Message, connection *Connection) {
@@ -116,12 +100,56 @@ func (s *Server) BroadcastMesssage(context context.Context, message *proto.Messa
 	}()
 
 	<-done
+}
+
+func (s *Server) CreateStream(pconn *proto.Connect, stream proto.Broadcast_CreateStreamServer) error {
+	user := pconn.User
+
+	grpcLog.Info(user.Name, " wants to join the chat")
+
+	connection := &Connection{
+		stream: stream,
+		id:     user.Id,
+		name:   user.Name,
+		active: true,
+		error:  make(chan error),
+	}
+
+	// Get client up to date & send "user join" message
+	s.message_vault.mu.Lock()
+	for _, message := range s.message_vault.messages {
+		send_message(message, connection)
+	}
+	s.message_vault.mu.Unlock()
+
+	join_message := Message{
+		Id:              user.Id,
+		Content:         "joined",
+		Timestamp:       latest_time(&s.message_vault),
+		Username:        user.Name,
+		IsStatusMessage: true,
+	}
+
+	add_message(&s.message_vault, &join_message)
+	send_to_all(s.connections, &join_message)
+
+	// Add client connection to pool of connections
+	s.connections = append(s.connections, connection)
+	return <-connection.error
+}
+
+func (s *Server) BroadcastMesssage(context context.Context, message *proto.Message) (*proto.Close, error) {
+	// Add message to server "vault"
+	add_message(&s.message_vault, message)
+
+	// Broadcast
+	send_to_all(s.connections, message)
+
 	return &proto.Close{}, nil
 }
 
 func main() {
-	var connections []*Connection
-	server := &Server{connections, proto.UnimplementedBroadcastServer{}, MessageVault{}}
+	server := &Server{make([]*Connection, 0), proto.UnimplementedBroadcastServer{}, MessageVault{}}
 
 	grpcServer := grpc.NewServer()
 	listener, err := net.Listen("tcp", ":8080")

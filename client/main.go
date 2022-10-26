@@ -21,6 +21,8 @@ var client proto.BroadcastClient
 var wait *sync.WaitGroup
 var lamport_clock LamportClock
 
+type Message = proto.Message
+
 type LamportClock struct {
 	mu   sync.Mutex
 	time int32
@@ -60,30 +62,44 @@ func connect(user *proto.User) error {
 		return fmt.Errorf("Connection failed :%v", err)
 	}
 
-	// TODO: add join
-
 	wait.Add(1)
 	go func(str proto.Broadcast_CreateStreamClient) {
 		defer wait.Done()
 
 		for {
-			msg, err := str.Recv()
+			message, err := str.Recv()
 			if err != nil {
 				streamerror = fmt.Errorf("Error reading message: %v", err)
 				break
 			}
 
-			if msg.Id == user.Id {
+			if message.Id == user.Id {
 				continue
 			}
 
-			if lamport_clock.time < msg.Timestamp {
-				set_time(&lamport_clock, msg.Timestamp)
+			if lamport_clock.time < message.Timestamp {
+				set_time(&lamport_clock, message.Timestamp)
 			}
 
-			fmt.Printf("%s : %s, at time %d\n", msg.Username, msg.Content, msg.Timestamp)
+			// Write message to console
+			fmt.Printf("t %d --- ", message.Timestamp)
 
-			update_time(&lamport_clock)
+			if message.IsStatusMessage {
+				switch {
+				case message.Content == "joined":
+					fmt.Printf("%s has joined the chat.", message.Username)
+				case message.Content == "left":
+					fmt.Printf("%s has joined the chat.", message.Username)
+				}
+			} else {
+				fmt.Printf("%s : \"%s\"", message.Username, message.Content)
+			}
+
+			fmt.Printf("\n")
+
+			if !message.IsStatusMessage {
+				update_time(&lamport_clock)
+			}
 		}
 
 	}(stream)
@@ -99,7 +115,7 @@ func main() {
 
 	id := sha256.Sum256([]byte(time.Now().String() + *name))
 
-	conn, err := grpc.Dial("192.168.176.116:8080", grpc.WithInsecure())
+	conn, err := grpc.Dial(":8080", grpc.WithInsecure())
 
 	if err != nil {
 		log.Fatalf("Couldn't connect to service: %v", err)
@@ -125,10 +141,11 @@ func main() {
 			update_time(&lamport_clock)
 
 			msg := &proto.Message{
-				Id:        user.Id,
-				Content:   text,
-				Timestamp: get_time(&lamport_clock),
-        Username: user.Name,
+				Id:              user.Id,
+				Content:         text,
+				Timestamp:       get_time(&lamport_clock),
+				Username:        user.Name,
+				IsStatusMessage: false,
 			}
 
 			_, err := client.BroadcastMesssage(context.Background(), msg)
