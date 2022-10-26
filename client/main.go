@@ -47,7 +47,7 @@ func connect(user *proto.User) error {
 				streamerror = fmt.Errorf("Error reading message: %v", err)
 				break
 			}
-			fmt.Printf("%v : %s\n", msg.Id, msg.Content)
+			fmt.Printf("%s : %s\n", msg.Username, msg.Content)
 		}
 
 	}(stream)
@@ -89,6 +89,7 @@ func main() {
 				Id: 	user.Id,
 				Content: scanner.Text(),
 				Timestamp: timestamp.String(),
+				Username: user.Name,
 			}
 
 			_, err := client.BroadcastMesssage(context.Background(), msg)

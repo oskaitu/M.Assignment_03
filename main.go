@@ -23,6 +23,7 @@ func init() {
 type Connection struct {
 	stream proto.Broadcast_CreateStreamServer
 	id     string
+	name string
 	active bool
 	error  chan error
 }
@@ -36,6 +37,7 @@ func (s *Server) CreateStream(pconn *proto.Connect, stream proto.Broadcast_Creat
 	conn := &Connection{
 		stream: stream,
 		id:     pconn.User.Id,
+		name: pconn.User.Name,
 		active: true,
 		error:  make(chan error),
 	}
@@ -56,7 +58,7 @@ func (s *Server) BroadcastMesssage(ctx context.Context, msg *proto.Message) (*pr
 
 			if conn.active {
 				err := conn.stream.Send(msg)
-				grpcLog.Info("Sending message to: ", conn.stream)
+				grpcLog.Info("Sending message to: ", conn.stream, " username:", conn.name)
 
 				if err != nil {
 					grpcLog.Errorf("Error with Stream: %s - Error: %v", conn.stream, err)
