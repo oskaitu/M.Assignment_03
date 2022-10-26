@@ -74,7 +74,7 @@ func main() {
 
 	id := sha256.Sum256([]byte(time.Now().String() + *name))
 
-	conn, err := grpc.Dial(":8080", grpc.WithInsecure())
+	conn, err := grpc.Dial("192.168.176.116:8080", grpc.WithInsecure())
 
 	if err != nil {
 		log.Fatalf("Couldn't connect to service: %v", err)

@@ -1,4 +1,5 @@
-FROM golang:alpine as build-env
+
+FROM golang:alpine as build-env2
 
 ENV GO111MODULE=on
 
@@ -11,7 +12,7 @@ WORKDIR /docker_folder
 
 COPY ./proto/service_grpc.pb.go /docker_folder/proto
 COPY ./proto/service.pb.go /docker_folder/proto
-COPY ./main.go /docker_folder
+COPY ./client/main.go /docker_folder
 
 COPY go.mod .
 COPY go.sum .
@@ -20,6 +21,4 @@ RUN go mod download
 
 RUN go build -o docker_folder .
 
-CMD ./docker_folder
-
-EXPOSE 8080
+CMD ./docker_folder -N "MR hardCode"

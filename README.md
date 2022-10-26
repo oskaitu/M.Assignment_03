@@ -16,7 +16,13 @@ COPY ./main.go /docker_folder
 
 ## To build the container:
 
+og
 docker build --tag=test .
+
+
+docker build -f dockerfile.server --tag=servertest .
+docker build -f dockerfile.client --tag=clienttest .
+
 
 ## To start the server:
 
@@ -27,6 +33,8 @@ remember to run server on a public network (not set to private)
 ## To connect the client (Remember to be inside the client folder):
 
 go run main.go -N "name"
+OR
+docker run --rm -it clienttest
 
 set client.go contain host IP address 
 check ipconfig /all under IPv4 
