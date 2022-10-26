@@ -20,7 +20,7 @@ docker build --tag=test .
 
 ## To start the server:
 
-docker run -it -p 8080:8080 test
+docker run --rm -it  -p 8080:8080 --name chatservice test
 
 ## To connect the client (Remember to be inside the client folder):
 

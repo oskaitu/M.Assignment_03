@@ -21,3 +21,5 @@ RUN go mod download
 RUN go build -o docker_folder .
 
 CMD ./docker_folder
+
+EXPOSE 8080
