@@ -72,14 +72,15 @@ func (c *broadcastClient) BroadcastMesssage(ctx context.Context, in *Message, op
 }
 
 // BroadcastServer is the server API for Broadcast service.
-// All implementations should embed UnimplementedBroadcastServer
+// All implementations must embed UnimplementedBroadcastServer
 // for forward compatibility
 type BroadcastServer interface {
 	CreateStream(*Connect, Broadcast_CreateStreamServer) error
 	BroadcastMesssage(context.Context, *Message) (*Close, error)
+	mustEmbedUnimplementedBroadcastServer()
 }
 
-// UnimplementedBroadcastServer should be embedded to have forward compatible implementations.
+// UnimplementedBroadcastServer must be embedded to have forward compatible implementations.
 type UnimplementedBroadcastServer struct {
 }
 
@@ -89,6 +90,7 @@ func (UnimplementedBroadcastServer) CreateStream(*Connect, Broadcast_CreateStrea
 func (UnimplementedBroadcastServer) BroadcastMesssage(context.Context, *Message) (*Close, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BroadcastMesssage not implemented")
 }
+func (UnimplementedBroadcastServer) mustEmbedUnimplementedBroadcastServer() {}
 
 // UnsafeBroadcastServer may be embedded to opt out of forward compatibility for this service.
 // Use of this interface is not recommended, as added methods to BroadcastServer will
