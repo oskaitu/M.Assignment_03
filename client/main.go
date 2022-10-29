@@ -169,18 +169,6 @@ func main() {
 
 	go func() {
 		wait.Wait()
-		
-		msg := &proto.Message{
-
-			Id:              user.Id,
-			Content:         "has left the chat",
-			Timestamp:       get_time(&lamport_clock),
-			Username:        user.Name,
-			IsStatusMessage: true,
-
-		}
-		client.BroadcastMesssage(context.Background(), msg)
-
 		close(done)
 	}()
 
