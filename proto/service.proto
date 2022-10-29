@@ -12,7 +12,8 @@ message Message{
     string id = 1;
     string content = 2;
     int32 timestamp = 3;
-    string username = 4; 
+    string username = 4;
+    bool is_status_message = 5;
 }
 
 message Connect {

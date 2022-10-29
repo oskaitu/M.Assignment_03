@@ -21,6 +21,8 @@ var wait *sync.WaitGroup
 var lamport_clock LamportClock
 var name = "Anon"
 
+type Message = proto.Message
+
 type LamportClock struct {
 	mu   sync.Mutex
 	time int32
@@ -59,30 +61,44 @@ func connect(user *proto.User) error {
 		return fmt.Errorf("Connection failed :%v", err)
 	}
 
-	// TODO: add join
-
 	wait.Add(1)
 	go func(str proto.Broadcast_CreateStreamClient) {
 		defer wait.Done()
 
 		for {
-			msg, err := str.Recv()
+			message, err := str.Recv()
 			if err != nil {
 				streamerror = fmt.Errorf("Error reading message: %v", err)
 				break
 			}
 
-			if msg.Id == user.Id {
+			if message.Id == user.Id {
 				continue
 			}
 
-			if lamport_clock.time < msg.Timestamp {
-				set_time(&lamport_clock, msg.Timestamp)
+			if lamport_clock.time < message.Timestamp {
+				set_time(&lamport_clock, message.Timestamp)
 			}
 
-			fmt.Printf("%s : %s, at time %d\n", msg.Username, msg.Content, msg.Timestamp)
+			// Write message to console
+			fmt.Printf("t %d --- ", message.Timestamp)
 
-			update_time(&lamport_clock)
+			if message.IsStatusMessage {
+				switch {
+				case message.Content == "joined":
+					fmt.Printf("%s has joined the chat.", message.Username)
+				case message.Content == "left":
+					fmt.Printf("%s has joined the chat.", message.Username)
+				}
+			} else {
+				fmt.Printf("%s : \"%s\"", message.Username, message.Content)
+			}
+
+			fmt.Printf("\n")
+
+			if !message.IsStatusMessage {
+				update_time(&lamport_clock)
+			}
 		}
 
 	}(stream)
@@ -100,6 +116,7 @@ func main() {
 
 		name = text
 	} */
+
 
 	fmt.Print("Enter username: ")
 	var userinput string
@@ -133,10 +150,13 @@ func main() {
 			update_time(&lamport_clock)
 
 			msg := &proto.Message{
-				Id:        user.Id,
-				Content:   text,
-				Timestamp: get_time(&lamport_clock),
-				Username:  user.Name,
+
+				Id:              user.Id,
+				Content:         text,
+				Timestamp:       get_time(&lamport_clock),
+				Username:        user.Name,
+				IsStatusMessage: false,
+
 			}
 
 			_, err := client.BroadcastMesssage(context.Background(), msg)
