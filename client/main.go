@@ -124,7 +124,7 @@ func main() {
 	name = userinput
 
 	id := sha256.Sum256([]byte(time.Now().String() + name))
-	conn, err := grpc.Dial("10.26.4.16:8080", grpc.WithInsecure())
+	conn, err := grpc.Dial(":8080", grpc.WithInsecure())
 
 	if err != nil {
 		log.Fatalf("Couldn't connect to service: %v", err)
@@ -158,7 +158,7 @@ func main() {
 				IsStatusMessage: false,
 
 			}
-
+			
 			_, err := client.BroadcastMesssage(context.Background(), msg)
 			if err != nil {
 				fmt.Printf("Error sending Message: %v", err)
@@ -169,6 +169,18 @@ func main() {
 
 	go func() {
 		wait.Wait()
+		
+		msg := &proto.Message{
+
+			Id:              user.Id,
+			Content:         "has left the chat",
+			Timestamp:       get_time(&lamport_clock),
+			Username:        user.Name,
+			IsStatusMessage: true,
+
+		}
+		client.BroadcastMesssage(context.Background(), msg)
+
 		close(done)
 	}()
 

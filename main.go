@@ -132,6 +132,7 @@ func (s *Server) CreateStream(pconn *proto.Connect, stream proto.Broadcast_Creat
 		Username:        user.Name,
 		IsStatusMessage: true,
 	}
+	
 
 	add_message(&s.message_vault, &join_message)
 	send_to_all(s.connections, &join_message)
