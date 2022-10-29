@@ -21,4 +21,4 @@ RUN go mod download
 
 RUN go build -o docker_folder .
 
-CMD ./docker_folder -N "MR hardCode"
+CMD ./docker_folder

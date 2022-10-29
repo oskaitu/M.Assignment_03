@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -20,6 +19,7 @@ import (
 var client proto.BroadcastClient
 var wait *sync.WaitGroup
 var lamport_clock LamportClock
+var name = "Anon"
 
 type Message = proto.Message
 
@@ -54,8 +54,7 @@ func connect(user *proto.User) error {
 	var streamerror error
 
 	stream, err := client.CreateStream(context.Background(), &proto.Connect{
-		User:   user,
-		Active: true,
+		User: user,
 	})
 
 	if err != nil {
@@ -110,12 +109,22 @@ func connect(user *proto.User) error {
 func main() {
 	done := make(chan int)
 
-	name := flag.String("N", "Anon", "The name of the user")
-	flag.Parse()
+	/* fmt.Print("Enter username: ")
+	scannerName := bufio.NewScanner(os.Stdin)
+	for scannerName.Scan() {
+		text := scannerName.Text()
 
-	id := sha256.Sum256([]byte(time.Now().String() + *name))
+		name = text
+	} */
 
-	conn, err := grpc.Dial(":8080", grpc.WithInsecure())
+
+	fmt.Print("Enter username: ")
+	var userinput string
+	fmt.Scanf("%s", &userinput)
+	name = userinput
+
+	id := sha256.Sum256([]byte(time.Now().String() + name))
+	conn, err := grpc.Dial("10.26.4.16:8080", grpc.WithInsecure())
 
 	if err != nil {
 		log.Fatalf("Couldn't connect to service: %v", err)
@@ -124,7 +133,7 @@ func main() {
 	client = proto.NewBroadcastClient(conn)
 	user := &proto.User{
 		Id:   hex.EncodeToString(id[:]),
-		Name: *name,
+		Name: name,
 	}
 
 	connect(user)
@@ -137,15 +146,17 @@ func main() {
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
 			text := scanner.Text()
-
+			
 			update_time(&lamport_clock)
 
 			msg := &proto.Message{
+
 				Id:              user.Id,
 				Content:         text,
 				Timestamp:       get_time(&lamport_clock),
 				Username:        user.Name,
 				IsStatusMessage: false,
+
 			}
 
 			_, err := client.BroadcastMesssage(context.Background(), msg)

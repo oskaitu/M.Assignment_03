@@ -18,7 +18,6 @@ message Message{
 
 message Connect {
     User user = 1;
-    bool active = 2;
 }
 
 message Close{}
