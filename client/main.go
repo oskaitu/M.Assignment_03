@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"sync"
 	"time"
@@ -76,6 +77,10 @@ func connect(user *proto.User) error {
 				continue
 			}
 
+			if message.Id == "keep-alive" {
+				continue
+			}
+
 			if lamport_clock.time < message.Timestamp {
 				set_time(&lamport_clock, message.Timestamp)
 			}
@@ -88,7 +93,7 @@ func connect(user *proto.User) error {
 				case message.Content == "joined":
 					fmt.Printf("%s has joined the chat.", message.Username)
 				case message.Content == "left":
-					fmt.Printf("%s has joined the chat.", message.Username)
+					fmt.Printf("%s has left the chat.", message.Username)
 				}
 			} else {
 				fmt.Printf("%s : \"%s\"", message.Username, message.Content)
@@ -106,6 +111,18 @@ func connect(user *proto.User) error {
 	return streamerror
 }
 
+func GetOutboundIP() net.IP {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP
+}
+
 func main() {
 	done := make(chan int)
 
@@ -117,14 +134,14 @@ func main() {
 		name = text
 	} */
 
-
 	fmt.Print("Enter username: ")
 	var userinput string
 	fmt.Scanf("%s", &userinput)
 	name = userinput
 
+	local_ip := GetOutboundIP()
 	id := sha256.Sum256([]byte(time.Now().String() + name))
-	conn, err := grpc.Dial(":8080", grpc.WithInsecure())
+	conn, err := grpc.Dial(local_ip.String()+":8080", grpc.WithInsecure())
 
 	if err != nil {
 		log.Fatalf("Couldn't connect to service: %v", err)
@@ -146,7 +163,7 @@ func main() {
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
 			text := scanner.Text()
-			
+
 			update_time(&lamport_clock)
 
 			msg := &proto.Message{
@@ -156,7 +173,6 @@ func main() {
 				Timestamp:       get_time(&lamport_clock),
 				Username:        user.Name,
 				IsStatusMessage: false,
-
 			}
 			
 			_, err := client.BroadcastMesssage(context.Background(), msg)
