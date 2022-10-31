@@ -117,14 +117,13 @@ func main() {
 		name = text
 	} */
 
-
 	fmt.Print("Enter username: ")
 	var userinput string
 	fmt.Scanf("%s", &userinput)
 	name = userinput
 
 	id := sha256.Sum256([]byte(time.Now().String() + name))
-	conn, err := grpc.Dial("10.26.4.16:8080", grpc.WithInsecure())
+	conn, err := grpc.Dial(":8080", grpc.WithInsecure())
 
 	if err != nil {
 		log.Fatalf("Couldn't connect to service: %v", err)
@@ -146,7 +145,7 @@ func main() {
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
 			text := scanner.Text()
-			
+
 			update_time(&lamport_clock)
 
 			msg := &proto.Message{
@@ -156,7 +155,6 @@ func main() {
 				Timestamp:       get_time(&lamport_clock),
 				Username:        user.Name,
 				IsStatusMessage: false,
-
 			}
 
 			_, err := client.BroadcastMesssage(context.Background(), msg)
