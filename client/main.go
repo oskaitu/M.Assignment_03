@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"sync"
 	"time"
@@ -110,6 +111,18 @@ func connect(user *proto.User) error {
 	return streamerror
 }
 
+func GetOutboundIP() net.IP {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP
+}
+
 func main() {
 	done := make(chan int)
 
@@ -126,8 +139,9 @@ func main() {
 	fmt.Scanf("%s", &userinput)
 	name = userinput
 
+	local_ip := GetOutboundIP()
 	id := sha256.Sum256([]byte(time.Now().String() + name))
-	conn, err := grpc.Dial(":8080", grpc.WithInsecure())
+	conn, err := grpc.Dial(local_ip.String()+":8080", grpc.WithInsecure())
 
 	if err != nil {
 		log.Fatalf("Couldn't connect to service: %v", err)
