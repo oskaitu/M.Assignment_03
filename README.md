@@ -20,21 +20,22 @@ og
 docker build --tag=test .
 
 
-docker build -f dockerfile.server --tag=servertest .
-docker build -f dockerfile.client --tag=clienttest .
+docker build -f dockerfile.server --tag=server .
+docker build -f dockerfile.client --tag=client .
 
 
 ## To start the server:
 
-docker run --rm -it  -p 8080:8080 --name chatservice servertest
+docker run --rm -it  -p 8080:8080 --name chatservice server
 
 remember to run server on a public network (not set to private)
 
 ## To connect the client (Remember to be inside the client folder):
 
-go run main.go -N "name"
+go run main.go
 OR
-docker run --rm -it clienttest
+docker run --rm  -it client
+fyi the clint.go grpcdial needs to be changed to whatever your ipv4 address is. so to make the client run as docker container you have to hardcode that as line 142 in client.go 
 
 set client.go contain host IP address 
 check ipconfig /all under IPv4 
