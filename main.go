@@ -7,6 +7,7 @@ import (
 	"os"
 	"sort"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 	glog "google.golang.org/grpc/grpclog"
@@ -66,7 +67,7 @@ func latest_time(vault *MessageVault) int32 {
 	return vault.messages[len(vault.messages)-1].Timestamp
 }
 
-func send_message(message *Message, connection *Connection) {
+func send_message(message *Message, connection *Connection, server *Server) {
 	if !connection.active {
 		return
 	}
@@ -75,25 +76,25 @@ func send_message(message *Message, connection *Connection) {
 	}
 
 	err := connection.stream.Send(message)
-	grpcLog.Info("Sending message to: ", connection.stream, " username:", connection.name)
+	if message.Id != "keep-alive" {
+		grpcLog.Info("Sending message to: ", connection.stream, " username: ", connection.name)
+	}
 
 	if err != nil {
-		grpcLog.Errorf("Error with Stream: %s - Error: %v", connection.stream, err)
-		connection.active = false
-		connection.error <- err
+		drop_connection(connection, server, err)
 	}
 }
 
-func send_to_all(connections []*Connection, message *Message) {
+func send_to_all(server *Server, message *Message) {
 	wait := sync.WaitGroup{}
 	done := make(chan int)
 
-	for _, connection := range connections {
+	for _, connection := range server.connections {
 		wait.Add(1)
 
 		go func(message *Message, connection *Connection) {
 			defer wait.Done()
-			send_message(message, connection)
+			send_message(message, connection, server)
 		}(message, connection)
 	}
 
@@ -105,7 +106,27 @@ func send_to_all(connections []*Connection, message *Message) {
 	<-done
 }
 
-func (s *Server) CreateStream(pconn *proto.Connect, stream proto.Broadcast_CreateStreamServer) error {
+func drop_connection(connection *Connection, server *Server, err error) {
+	grpcLog.Errorf("Error with Stream: %s - Error: %v", connection.stream, err)
+	grpcLog.Errorf("Dropping connection to: %s", connection.name)
+	connection.active = false
+	connection.error <- err
+
+	left_message := &Message{
+		Id:              connection.id,
+		Content:         "left",
+		Timestamp:       latest_time(&server.message_vault),
+		Username:        connection.name,
+		IsStatusMessage: true,
+	}
+
+	// Add message to server "vault"
+	add_message(&server.message_vault, left_message)
+
+	send_to_all(server, left_message)
+}
+
+func (server *Server) CreateStream(pconn *proto.Connect, stream proto.Broadcast_CreateStreamServer) error {
 	user := pconn.User
 
 	grpcLog.Info(user.Name, " wants to join the chat")
@@ -119,34 +140,49 @@ func (s *Server) CreateStream(pconn *proto.Connect, stream proto.Broadcast_Creat
 	}
 
 	// Get client up to date & send "user join" message
-	s.message_vault.mu.Lock()
-	for _, message := range s.message_vault.messages {
-		send_message(message, connection)
+	server.message_vault.mu.Lock()
+	for _, message := range server.message_vault.messages {
+		send_message(message, connection, server)
 	}
-	s.message_vault.mu.Unlock()
+	server.message_vault.mu.Unlock()
 
 	join_message := Message{
 		Id:              user.Id,
 		Content:         "joined",
-		Timestamp:       latest_time(&s.message_vault),
+		Timestamp:       latest_time(&server.message_vault),
 		Username:        user.Name,
 		IsStatusMessage: true,
 	}
 
-	add_message(&s.message_vault, &join_message)
-	send_to_all(s.connections, &join_message)
+	add_message(&server.message_vault, &join_message)
+	send_to_all(server, &join_message)
+
+	// Keep alive message loop
+	go func() {
+		for {
+			keep_alive_message := Message{
+				Id:              "keep-alive",
+				Content:         "keep-alive",
+				Timestamp:       latest_time(&server.message_vault),
+				Username:        "",
+				IsStatusMessage: true,
+			}
+			send_message(&keep_alive_message, connection, server)
+			time.Sleep(time.Second)
+		}
+	}()
 
 	// Add client connection to pool of connections
-	s.connections = append(s.connections, connection)
+	server.connections = append(server.connections, connection)
 	return <-connection.error
 }
 
-func (s *Server) BroadcastMesssage(context context.Context, message *proto.Message) (*proto.Close, error) {
+func (server *Server) BroadcastMesssage(context context.Context, message *proto.Message) (*proto.Close, error) {
 	// Add message to server "vault"
-	add_message(&s.message_vault, message)
+	add_message(&server.message_vault, message)
 
 	// Broadcast
-	send_to_all(s.connections, message)
+	send_to_all(server, message)
 
 	return &proto.Close{}, nil
 }

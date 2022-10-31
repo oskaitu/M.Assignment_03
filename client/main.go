@@ -76,6 +76,10 @@ func connect(user *proto.User) error {
 				continue
 			}
 
+			if message.Id == "keep-alive" {
+				continue
+			}
+
 			if lamport_clock.time < message.Timestamp {
 				set_time(&lamport_clock, message.Timestamp)
 			}
@@ -88,7 +92,7 @@ func connect(user *proto.User) error {
 				case message.Content == "joined":
 					fmt.Printf("%s has joined the chat.", message.Username)
 				case message.Content == "left":
-					fmt.Printf("%s has joined the chat.", message.Username)
+					fmt.Printf("%s has left the chat.", message.Username)
 				}
 			} else {
 				fmt.Printf("%s : \"%s\"", message.Username, message.Content)
