@@ -8,7 +8,7 @@ message User{
     string name = 2;
 }
 
-message Message{
+message ChatMessage{
     string id = 1;
     string content = 2;
     int32 timestamp = 3;
@@ -22,7 +22,7 @@ message Connect {
 
 message Close{}
 
-service Broadcast{
-    rpc CreateStream(Connect) returns (stream Message);
-    rpc BroadcastMesssage(Message) returns (Close);
+service ChittyChat{
+    rpc Join(Connect) returns (stream ChatMessage);
+    rpc Publish(ChatMessage) returns (Close);
 }

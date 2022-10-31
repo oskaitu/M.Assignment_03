@@ -17,12 +17,12 @@ import (
 	proto "github.com/oskaitu/M.Assignment_03/proto"
 )
 
-var client proto.BroadcastClient
+var client proto.ChittyChatClient
 var wait *sync.WaitGroup
 var lamport_clock LamportClock
 var name = "Anon"
 
-type Message = proto.Message
+type ChatMessage = proto.ChatMessage
 
 type LamportClock struct {
 	mu   sync.Mutex
@@ -54,7 +54,7 @@ func init() {
 func connect(user *proto.User) error {
 	var streamerror error
 
-	stream, err := client.CreateStream(context.Background(), &proto.Connect{
+	stream, err := client.Join(context.Background(), &proto.Connect{
 		User: user,
 	})
 
@@ -63,11 +63,11 @@ func connect(user *proto.User) error {
 	}
 
 	wait.Add(1)
-	go func(str proto.Broadcast_CreateStreamClient) {
+	go func(stream proto.ChittyChat_JoinClient) {
 		defer wait.Done()
 
 		for {
-			message, err := str.Recv()
+			message, err := stream.Recv()
 			if err != nil {
 				streamerror = fmt.Errorf("Error reading message: %v", err)
 				break
@@ -111,7 +111,7 @@ func connect(user *proto.User) error {
 	return streamerror
 }
 
-func GetOutboundIP() net.IP {
+func get_outbound_IP() net.IP {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
 		log.Fatal(err)
@@ -139,7 +139,7 @@ func main() {
 	fmt.Scanf("%s", &userinput)
 	name = userinput
 
-	local_ip := GetOutboundIP()
+	local_ip := get_outbound_IP()
 	id := sha256.Sum256([]byte(time.Now().String() + name))
 	conn, err := grpc.Dial(local_ip.String()+":8080", grpc.WithInsecure())
 
@@ -147,7 +147,7 @@ func main() {
 		log.Fatalf("Couldn't connect to service: %v", err)
 	}
 
-	client = proto.NewBroadcastClient(conn)
+	client = proto.NewChittyChatClient(conn)
 	user := &proto.User{
 		Id:   hex.EncodeToString(id[:]),
 		Name: name,
@@ -166,7 +166,7 @@ func main() {
 
 			update_time(&lamport_clock)
 
-			msg := &proto.Message{
+			msg := &ChatMessage{
 
 				Id:              user.Id,
 				Content:         text,
@@ -174,8 +174,8 @@ func main() {
 				Username:        user.Name,
 				IsStatusMessage: false,
 			}
-			
-			_, err := client.BroadcastMesssage(context.Background(), msg)
+
+			_, err := client.Publish(context.Background(), msg)
 			if err != nil {
 				fmt.Printf("Error sending Message: %v", err)
 				break

@@ -23,27 +23,27 @@ func init() {
 
 // TODO: Add name to connection
 type Connection struct {
-	stream proto.Broadcast_CreateStreamServer
+	stream proto.ChittyChat_JoinServer
 	id     string
 	name   string
 	active bool
 	error  chan error
 }
 
-type Message = proto.Message
+type ChatMessage = proto.ChatMessage
 
-type MessageVault struct {
+type ChatMessageVault struct {
 	mu       sync.Mutex
-	messages []*Message
+	messages []*ChatMessage
 }
 
 type Server struct {
 	connections []*Connection
-	proto.BroadcastServer
-	message_vault MessageVault
+	proto.ChittyChatServer
+	message_vault ChatMessageVault
 }
 
-func add_message(vault *MessageVault, message *Message) {
+func add_message(vault *ChatMessageVault, message *ChatMessage) {
 	vault.mu.Lock()
 	defer vault.mu.Unlock()
 	// Append the new message
@@ -58,7 +58,7 @@ func add_message(vault *MessageVault, message *Message) {
 	})
 }
 
-func latest_time(vault *MessageVault) int32 {
+func latest_time(vault *ChatMessageVault) int32 {
 	vault.mu.Lock()
 	defer vault.mu.Unlock()
 	if len(vault.messages) == 0 {
@@ -67,7 +67,7 @@ func latest_time(vault *MessageVault) int32 {
 	return vault.messages[len(vault.messages)-1].Timestamp
 }
 
-func send_message(message *Message, connection *Connection, server *Server) {
+func send_message(message *ChatMessage, connection *Connection, server *Server) {
 	if !connection.active {
 		return
 	}
@@ -85,14 +85,14 @@ func send_message(message *Message, connection *Connection, server *Server) {
 	}
 }
 
-func send_to_all(server *Server, message *Message) {
+func send_to_all(server *Server, message *ChatMessage) {
 	wait := sync.WaitGroup{}
 	done := make(chan int)
 
 	for _, connection := range server.connections {
 		wait.Add(1)
 
-		go func(message *Message, connection *Connection) {
+		go func(message *ChatMessage, connection *Connection) {
 			defer wait.Done()
 			send_message(message, connection, server)
 		}(message, connection)
@@ -112,7 +112,7 @@ func drop_connection(connection *Connection, server *Server, err error) {
 	connection.active = false
 	connection.error <- err
 
-	left_message := &Message{
+	left_message := &ChatMessage{
 		Id:              connection.id,
 		Content:         "left",
 		Timestamp:       latest_time(&server.message_vault),
@@ -126,7 +126,7 @@ func drop_connection(connection *Connection, server *Server, err error) {
 	send_to_all(server, left_message)
 }
 
-func (server *Server) CreateStream(pconn *proto.Connect, stream proto.Broadcast_CreateStreamServer) error {
+func (server *Server) Join(pconn *proto.Connect, stream proto.ChittyChat_JoinServer) error {
 	user := pconn.User
 
 	grpcLog.Info(user.Name, " wants to join the chat")
@@ -146,14 +146,13 @@ func (server *Server) CreateStream(pconn *proto.Connect, stream proto.Broadcast_
 	}
 	server.message_vault.mu.Unlock()
 
-	join_message := Message{
+	join_message := ChatMessage{
 		Id:              user.Id,
 		Content:         "joined",
 		Timestamp:       latest_time(&server.message_vault),
 		Username:        user.Name,
 		IsStatusMessage: true,
 	}
-	
 
 	add_message(&server.message_vault, &join_message)
 	send_to_all(server, &join_message)
@@ -161,7 +160,7 @@ func (server *Server) CreateStream(pconn *proto.Connect, stream proto.Broadcast_
 	// Keep alive message loop
 	go func() {
 		for {
-			keep_alive_message := Message{
+			keep_alive_message := ChatMessage{
 				Id:              "keep-alive",
 				Content:         "keep-alive",
 				Timestamp:       latest_time(&server.message_vault),
@@ -178,7 +177,7 @@ func (server *Server) CreateStream(pconn *proto.Connect, stream proto.Broadcast_
 	return <-connection.error
 }
 
-func (server *Server) BroadcastMesssage(context context.Context, message *proto.Message) (*proto.Close, error) {
+func (server *Server) Publish(context context.Context, message *proto.ChatMessage) (*proto.Close, error) {
 	// Add message to server "vault"
 	add_message(&server.message_vault, message)
 
@@ -189,7 +188,7 @@ func (server *Server) BroadcastMesssage(context context.Context, message *proto.
 }
 
 func main() {
-	server := &Server{make([]*Connection, 0), proto.UnimplementedBroadcastServer{}, MessageVault{}}
+	server := &Server{make([]*Connection, 0), proto.UnimplementedChittyChatServer{}, ChatMessageVault{}}
 
 	grpcServer := grpc.NewServer()
 	listener, err := net.Listen("tcp", ":8080")
@@ -199,7 +198,7 @@ func main() {
 
 	grpcLog.Info("Starting server at port :8080")
 
-	proto.RegisterBroadcastServer(grpcServer, server)
+	proto.RegisterChittyChatServer(grpcServer, server)
 	grpcServer.Serve(listener)
 
 }
