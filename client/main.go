@@ -73,16 +73,17 @@ func connect(user *proto.User) error {
 				break
 			}
 
-			if message.Id == user.Id {
-				continue
-			}
-
-			if message.Id == "keep-alive" {
+			if message.UserId == "keep-alive" {
 				continue
 			}
 
 			if lamport_clock.time < message.Timestamp {
 				set_time(&lamport_clock, message.Timestamp)
+			}
+
+			// Don't write message if the id is the same as user id
+			if message.UserId == user.Id {
+				continue
 			}
 
 			// Write message to console
@@ -91,19 +92,17 @@ func connect(user *proto.User) error {
 			if message.IsStatusMessage {
 				switch {
 				case message.Content == "joined":
-					fmt.Printf("%s has joined the chat.", message.Username)
+					fmt.Printf("%s has joined the chat.", message.UserName)
 				case message.Content == "left":
-					fmt.Printf("%s has left the chat.", message.Username)
+					fmt.Printf("%s has left the chat.", message.UserName)
 				}
 			} else {
-				fmt.Printf("%s : \"%s\"", message.Username, message.Content)
+				fmt.Printf("%s : \"%s\"", message.UserName, message.Content)
 			}
 
 			fmt.Printf("\n")
 
-			if !message.IsStatusMessage {
-				update_time(&lamport_clock)
-			}
+			update_time(&lamport_clock)
 		}
 
 	}(stream)
@@ -125,14 +124,6 @@ func get_outbound_IP() net.IP {
 
 func main() {
 	done := make(chan int)
-
-	/* fmt.Print("Enter username: ")
-	scannerName := bufio.NewScanner(os.Stdin)
-	for scannerName.Scan() {
-		text := scannerName.Text()
-
-		name = text
-	} */
 
 	fmt.Print("Enter username: ")
 	var userinput string
@@ -166,16 +157,15 @@ func main() {
 
 			update_time(&lamport_clock)
 
-			msg := &ChatMessage{
-
-				Id:              user.Id,
+			message := ChatMessage{
+				UserId:          user.Id,
 				Content:         text,
 				Timestamp:       get_time(&lamport_clock),
-				Username:        user.Name,
+				UserName:        user.Name,
 				IsStatusMessage: false,
 			}
 
-			_, err := client.Publish(context.Background(), msg)
+			_, err := client.Publish(context.Background(), &message)
 			if err != nil {
 				fmt.Printf("Error sending Message: %v", err)
 				break

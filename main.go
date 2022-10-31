@@ -21,13 +21,12 @@ func init() {
 	grpcLog = glog.NewLoggerV2(os.Stdout, os.Stdout, os.Stdout)
 }
 
-// TODO: Add name to connection
 type Connection struct {
-	stream proto.ChittyChat_JoinServer
-	id     string
-	name   string
-	active bool
-	error  chan error
+	stream  proto.ChittyChat_JoinServer
+	user_id string
+	name    string
+	active  bool
+	error   chan error
 }
 
 type ChatMessage = proto.ChatMessage
@@ -54,7 +53,7 @@ func add_message(vault *ChatMessageVault, message *ChatMessage) {
 		if message_one.Timestamp != message_two.Timestamp {
 			return message_one.Timestamp < message_two.Timestamp
 		}
-		return message_one.Id < message_two.Id
+		return message_one.UserId < message_two.UserId
 	})
 }
 
@@ -76,7 +75,7 @@ func send_message(message *ChatMessage, connection *Connection, server *Server) 
 	}
 
 	err := connection.stream.Send(message)
-	if message.Id != "keep-alive" {
+	if message.UserId != "keep-alive" {
 		grpcLog.Info("Sending message to: ", connection.stream, " username: ", connection.name)
 	}
 
@@ -113,10 +112,10 @@ func drop_connection(connection *Connection, server *Server, err error) {
 	connection.error <- err
 
 	left_message := &ChatMessage{
-		Id:              connection.id,
+		UserId:          connection.user_id,
 		Content:         "left",
-		Timestamp:       latest_time(&server.message_vault),
-		Username:        connection.name,
+		Timestamp:       latest_time(&server.message_vault) + 1,
+		UserName:        connection.name,
 		IsStatusMessage: true,
 	}
 
@@ -132,11 +131,11 @@ func (server *Server) Join(pconn *proto.Connect, stream proto.ChittyChat_JoinSer
 	grpcLog.Info(user.Name, " wants to join the chat")
 
 	connection := &Connection{
-		stream: stream,
-		id:     user.Id,
-		name:   user.Name,
-		active: true,
-		error:  make(chan error),
+		stream:  stream,
+		user_id: user.Id,
+		name:    user.Name,
+		active:  true,
+		error:   make(chan error),
 	}
 
 	// Get client up to date & send "user join" message
@@ -146,11 +145,15 @@ func (server *Server) Join(pconn *proto.Connect, stream proto.ChittyChat_JoinSer
 	}
 	server.message_vault.mu.Unlock()
 
+	// Add client connection to pool of connections
+	server.connections = append(server.connections, connection)
+
+	// Send out join message
 	join_message := ChatMessage{
-		Id:              user.Id,
+		UserId:          user.Id,
 		Content:         "joined",
-		Timestamp:       latest_time(&server.message_vault),
-		Username:        user.Name,
+		Timestamp:       latest_time(&server.message_vault) + 1,
+		UserName:        user.Name,
 		IsStatusMessage: true,
 	}
 
@@ -161,10 +164,10 @@ func (server *Server) Join(pconn *proto.Connect, stream proto.ChittyChat_JoinSer
 	go func() {
 		for {
 			keep_alive_message := ChatMessage{
-				Id:              "keep-alive",
+				UserId:          "keep-alive",
 				Content:         "keep-alive",
 				Timestamp:       latest_time(&server.message_vault),
-				Username:        "",
+				UserName:        "",
 				IsStatusMessage: true,
 			}
 			send_message(&keep_alive_message, connection, server)
@@ -172,8 +175,6 @@ func (server *Server) Join(pconn *proto.Connect, stream proto.ChittyChat_JoinSer
 		}
 	}()
 
-	// Add client connection to pool of connections
-	server.connections = append(server.connections, connection)
 	return <-connection.error
 }
 
