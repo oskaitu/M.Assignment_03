@@ -174,7 +174,7 @@ func main() {
 				Username:        user.Name,
 				IsStatusMessage: false,
 			}
-
+			
 			_, err := client.BroadcastMesssage(context.Background(), msg)
 			if err != nil {
 				fmt.Printf("Error sending Message: %v", err)
